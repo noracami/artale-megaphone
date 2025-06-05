@@ -18,7 +18,18 @@ PG_CONFIG = {
 
 WS_URL = os.getenv("WS_URL", "")
 # Time in seconds to wait before attempting to reconnect the WebSocket
-RECONNECT_DELAY = int(os.getenv("WS_RECONNECT_DELAY", 5))
+_delay_val_str = os.getenv("WS_RECONNECT_DELAY", "5")  # Default to string "5"
+RECONNECT_DELAY = 5  # Default value if parsing fails or value is invalid
+try:
+    parsed_delay = int(_delay_val_str)
+    if parsed_delay > 0:
+        RECONNECT_DELAY = parsed_delay
+    else:
+        # Log warning if non-positive and use the default
+        print(f"[WARN] WS_RECONNECT_DELAY ('{_delay_val_str}') must be positive. Using default {RECONNECT_DELAY}s.")
+except ValueError:
+    # Log warning if not an int and use the default
+    print(f"[WARN] WS_RECONNECT_DELAY ('{_delay_val_str}') is not a valid integer. Using default {RECONNECT_DELAY}s.")
 
 # --- 全域變數 ---
 loop = asyncio.new_event_loop()
