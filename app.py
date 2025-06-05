@@ -17,6 +17,8 @@ PG_CONFIG = {
 }
 
 WS_URL = os.getenv("WS_URL", "")
+# Time in seconds to wait before attempting to reconnect the WebSocket
+RECONNECT_DELAY = int(os.getenv("WS_RECONNECT_DELAY", 5))
 
 # --- 全域變數 ---
 loop = asyncio.new_event_loop()
@@ -61,33 +63,39 @@ def store_messages(messages):
 
 
 async def listen_forever():
+    """Continuously listen to the WebSocket and auto reconnect on failure."""
     global websocket
-    try:
-        async with websockets.connect(WS_URL) as ws:
-            websocket = ws
-            print("[INFO] Connected to", WS_URL)
+    while True:
+        try:
+            async with websockets.connect(WS_URL) as ws:
+                websocket = ws
+                print("[INFO] Connected to", WS_URL)
 
-            await ws.send(json.dumps({"type": "ping"}))
-            print("[SEND] ping")
+                await ws.send(json.dumps({"type": "ping"}))
+                print("[SEND] ping")
 
-            while True:
-                try:
-                    message = await ws.recv()
-                    data = json.loads(message)
+                while True:
+                    try:
+                        message = await ws.recv()
+                        data = json.loads(message)
 
-                    if isinstance(data, list):
-                        store_messages(data)
-                    else:
-                        print("[RECV SINGLE]", data)
+                        if isinstance(data, list):
+                            store_messages(data)
+                        else:
+                            print("[RECV SINGLE]", data)
 
-                except websockets.ConnectionClosed:
-                    print("[WARN] WebSocket connection closed")
-                    break
-                except Exception as e:
-                    print("[ERROR]", str(e))
-                    break
-    except Exception as e:
-        print("[FATAL ERROR]", str(e))
+                    except websockets.ConnectionClosed:
+                        print(f"[WARN] WebSocket connection closed. Reconnecting in {RECONNECT_DELAY}s...")
+                        websocket = None
+                        break
+                    except Exception as e:
+                        print("[ERROR]", str(e))
+                        websocket = None
+                        break
+        except Exception as e:
+            print("[FATAL ERROR]", str(e))
+            websocket = None
+        await asyncio.sleep(RECONNECT_DELAY)
 
 
 # --- Shutdown handler ---
